@@ -10,6 +10,7 @@ junit = "4.13.2"
 androidxJunit = "1.2.1"
 espressoCore = "3.6.1"
 okhttp = "4.10.0"
+roomCompilerProcessingTesting = "2.7.2"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -35,3 +36,4 @@ androidx-vectordrawable = { group = "androidx.vectordrawable", name = "vectordra
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-room-compiler-processing-testing = { group = "androidx.room", name = "room-compiler-processing-testing", version.ref = "roomCompilerProcessingTesting" }
