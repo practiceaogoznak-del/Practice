@@ -17,7 +17,7 @@
         android:textColor="#000000"
         android:textSize="24dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/toggleStorage"
+        app:layout_constraintStart_toEndOf="@id/dbStatus"
         android:layout_margin="10dp"
         />
     <TextView
@@ -114,11 +114,11 @@
             <Button
                 android:id="@+id/resetButton"
                 android:layout_width="80dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/red"
                 android:text="✕"
-                android:textSize="28dp"
                 android:textColor="#FFFFFF"
-                android:background="@color/red"/>
+                android:textSize="28dp" />
 
         </LinearLayout>
 
@@ -127,7 +127,7 @@
             android:id="@+id/statusText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:textSize="20dp"
+            android:textSize="13dp"
             android:textColor="#000000"
             android:textStyle="bold"
             android:gravity="start"
@@ -148,7 +148,7 @@
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:text="Заделка проверена"
-            android:textSize="18dp"
+            android:textSize="15dp"
             android:textColor="#FFFFFF"
             android:background="@color/red"
             android:textAllCaps="false"
@@ -185,12 +185,12 @@
             android:id="@+id/resultStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="88dp"
             android:layout_marginLeft="140dp"
+            android:layout_marginTop="120dp"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.945"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@id/resultContainer"
-        />
+            app:layout_constraintTop_toTopOf="@id/resultContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

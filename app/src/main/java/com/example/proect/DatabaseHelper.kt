@@ -29,12 +29,12 @@ class DatabaseHelper(private val context: Context) {
 
     // Database connection details (replace with your actual values)
     // WARNING: Do NOT hardcode credentials in production code! Use secure storage (e.g., Android Keystore) or environment variables.
-    private val server = "your_server_ip_or_hostname"  // e.g., "192.168.1.100" or "sqlserver.example.com"
+    private val server = "06SQL"  // e.g., "192.168.1.100" or "sqlserver.example.com"
     private val port = "1433"  // Default SQL Server port
-    private val databaseName = "your_database_name"
-    private val username = "your_sql_username"
-    private val password = "your_sql_password"
-    private val connectionUrl = "jdbc:jtds:sqlserver://$server:$port;databaseName=$databaseName;user=$username;password=$password;encrypt=true;trustServerCertificate=true"
+    private val databaseName = "PPFDATA"
+    private val username = "arm79100"
+    private val password = "Android79100"
+    private val connectionUrl = "jdbc:jtds:sqlserver://$server;databaseName=$databaseName;user=$username;password=$password;encrypt=true;trustServerCertificate=true"
 
     // Test the database connection
     suspend fun testConnection(): String = withContext(Dispatchers.IO) {
@@ -71,7 +71,7 @@ class DatabaseHelper(private val context: Context) {
             Class.forName("net.sourceforge.jtds.jdbc.Driver")
             connection = DriverManager.getConnection(connectionUrl)
             val query = """
-                INSERT INTO zadelka (series1, series2, number, ci, input_tabnom, input_datetime, defect_id, comment)
+                INSERT INTO arm79100.zadelka (series1, series2, number, ci, input_tabnom, input_datetime, defect_id, comment)
                 VALUES (?, ?, ?, ?, ?, GETDATE(), ?, ?)
             """
             preparedStatement = connection.prepareStatement(query)
@@ -93,43 +93,69 @@ class DatabaseHelper(private val context: Context) {
         }
     }
 
-    // Read a record by number (series1 + series2 + number)
-    suspend fun checkNumberStatus(number: String): Triple<String, Boolean, Int> = withContext(Dispatchers.IO) {
+
+    suspend fun checkNumberStatus(number: String, workerId: String, ci: String): Triple<String, Boolean, Int> = withContext(Dispatchers.IO) {
         var connection: Connection? = null
         var preparedStatement: PreparedStatement? = null
         var resultSet: ResultSet? = null
+
         try {
             if (number.length != 10) {
                 return@withContext Triple("Неправильный формат номера", false, android.R.color.holo_red_light)
             }
+
             val series1 = number.substring(0, 2)
             val series2 = number.substring(2, 4)
             val num = number.substring(4)
+
             Class.forName("net.sourceforge.jtds.jdbc.Driver")
             connection = DriverManager.getConnection(connectionUrl)
-            val query = """
-                SELECT checked_tabnom, checked_datetime, defect_id, comment
-                FROM zadelka
-                WHERE series1 = ? AND series2 = ? AND number = ?
-            """
-            preparedStatement = connection.prepareStatement(query)
+
+            // Добавляем фильтр по CI
+            val selectQuery = """
+            SELECT id, checked_datetime
+            FROM arm79100.zadelka
+            WHERE series1 = ? AND series2 = ? AND number = ? AND ci = ?
+        """
+            preparedStatement = connection.prepareStatement(selectQuery)
             preparedStatement.setString(1, series1)
             preparedStatement.setString(2, series2)
             preparedStatement.setString(3, num)
+            preparedStatement.setString(4, ci)
             resultSet = preparedStatement.executeQuery()
-            if (resultSet.next()) {
-                val checkedTabnom = resultSet.getString("checked_tabnom")
-                val checkedDatetime = resultSet.getTimestamp("checked_datetime")
-                return@withContext if (checkedTabnom != null && checkedDatetime != null) {
-                    Triple("Отсканирован ($checkedTabnom)", false, android.R.color.holo_red_light)
-                } else {
-                    Triple("Активен", true, android.R.color.holo_green_light)
-                }
-            } else {
+
+            if (!resultSet.next()) {
                 return@withContext Triple("Не найден", false, android.R.color.holo_red_light)
             }
+
+            val zadelkaId = resultSet.getInt("id")
+            val checkedDatetime = resultSet.getTimestamp("checked_datetime")
+
+            resultSet.close()
+            preparedStatement.close()
+
+            return@withContext if (checkedDatetime != null) {
+                Triple("Заделка была проверена ранее", false, android.R.color.holo_orange_light)
+            } else {
+                val updateQuery = """
+                UPDATE arm79100.zadelka
+                SET checked_tabnom = ?, checked_datetime = GETDATE()
+                WHERE id = ?
+            """
+                preparedStatement = connection.prepareStatement(updateQuery)
+                preparedStatement.setString(1, workerId)
+                preparedStatement.setInt(2, zadelkaId)
+                val rowsAffected = preparedStatement.executeUpdate()
+
+                if (rowsAffected > 0) {
+                    Triple("Заделка проверена", false, android.R.color.holo_green_light)
+                } else {
+                    Triple("Ошибка обновления", false, android.R.color.holo_red_light)
+                }
+            }
+
         } catch (e: SQLException) {
-            Log.e("DBHelper", "Query failed", e)
+            Log.e("DBHelper", "CheckNumberStatus failed", e)
             return@withContext Triple("Ошибка: ${e.message}", false, android.R.color.holo_red_light)
         } finally {
             resultSet?.close()
@@ -150,7 +176,7 @@ class DatabaseHelper(private val context: Context) {
             val query = """
                 SELECT id, series1, series2, number, ci, input_tabnom, input_datetime, 
                        checked_tabnom, checked_datetime, defect_id, comment
-                FROM zadelka
+                FROM arm79100.zadelka
             """
             preparedStatement = connection.prepareStatement(query)
             resultSet = preparedStatement.executeQuery()
@@ -197,7 +223,7 @@ class DatabaseHelper(private val context: Context) {
             Class.forName("net.sourceforge.jtds.jdbc.Driver")
             connection = DriverManager.getConnection(connectionUrl)
             val query = """
-                UPDATE zadelka
+                UPDATE arm79100.zadelka
                 SET checked_tabnom = ?, checked_datetime = GETDATE()
                 WHERE series1 = ? AND series2 = ? AND number = ?
             """
@@ -225,7 +251,7 @@ class DatabaseHelper(private val context: Context) {
             Class.forName("net.sourceforge.jtds.jdbc.Driver")
             connection = DriverManager.getConnection(connectionUrl)
             val query = """
-                UPDATE zadelka
+                UPDATE arm79100.zadelka
                 SET defect_id = ?, comment = ?
                 WHERE id = ?
             """
@@ -251,7 +277,7 @@ class DatabaseHelper(private val context: Context) {
         try {
             Class.forName("net.sourceforge.jtds.jdbc.Driver")
             connection = DriverManager.getConnection(connectionUrl)
-            val query = "DELETE FROM zadelka WHERE id = ?"
+            val query = "DELETE FROM arm79100.zadelka WHERE id = ?"
             preparedStatement = connection.prepareStatement(query)
             preparedStatement.setInt(1, id)
             val rowsAffected = preparedStatement.executeUpdate()

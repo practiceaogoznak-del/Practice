@@ -70,7 +70,15 @@ class MainActivity : AppCompatActivity() {
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
         .build()
+    // Сопоставление значения спиннера с кодом CI
+    private val ciMap = mapOf(
+        "титул" to "03",
+        "книжка" to "05",
+        "вн.лист" to "53"
+    )
 
+    // Хранит выбранный код CI
+    private var selectedCiCode: String = ""
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) {
@@ -111,48 +119,69 @@ class MainActivity : AppCompatActivity() {
             override fun onItemSelected(
                 parent: AdapterView<*>, view: View?, position: Int, id: Long
             ) {
+                val selectedItem = parent.getItemAtPosition(position).toString()
+                selectedCiCode = ciMap[selectedItem] ?: ""
 
+                // Обновляем статус на экране
+                binding.statusText.text = if (selectedCiCode.isNotEmpty()) {
+                    "Выбран: $selectedItem "
+                } else {
+                    "Ничего не выбрано"
+                }
+
+                // Если уже есть распознанный номер, проверяем его **без изменения**
+                if (part3Digits.length == 10) {
+                    showNumberStatus(part3Digits)
+                }
             }
+
 
             override fun onNothingSelected(parent: AdapterView<*>) {
                 binding.statusText.text = "Ничего не выбрано"
+                selectedCiCode = ""
             }
         }
+
         binding.scanButton.setOnClickListener {
-            if (isScanning) {
-                Toast.makeText(this, "Подождите, идет сканирование", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (currentWorkerId.isEmpty()) {
-                Toast.makeText(this, "Введите табельный номер", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (part3Digits.length != 10) {
-                Toast.makeText(this, "Номер не распознан", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            if (currentWorkerId.isEmpty() || part3Digits.length != 10) return@setOnClickListener
+
             CoroutineScope(Dispatchers.Main).launch {
-                val success = databaseHelper.updateNumberStatus(part3Digits, currentWorkerId)
-                if (success) {
-                    val (statusText, isScannable, colorRes) = databaseHelper.checkNumberStatus(part3Digits)
-                    binding.statusText.text = statusText
-                    binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, colorRes))
-                    updateScanButtonState(false)
-                    Toast.makeText(this@MainActivity, "Статус обновлен в БД ($currentWorkerFio)", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this@MainActivity, "Ошибка обновления статуса в БД", Toast.LENGTH_SHORT).show()
-                }
+                val (statusText, _, colorRes) = databaseHelper.checkNumberStatus(part3Digits, currentWorkerId, selectedCiCode)
+                binding.scanButton.text = statusText
+                binding.scanButton.setBackgroundColor(ContextCompat.getColor(this@MainActivity, colorRes))
             }
         }
+
         binding.resetButton.setOnClickListener {
             resetScanning()
         }
         binding.openBaza.setOnClickListener {
             CoroutineScope(Dispatchers.Main).launch {
-                val status = databaseHelper.testConnection()
+                // Сначала проверяем соединение
+                val connectionStatus = databaseHelper.testConnection()
+
+                // Получаем все записи из таблицы
+                val allRecords = databaseHelper.getAllRecords()
+
+                // Формируем строку для отображения
+                val recordsText = if (allRecords.isEmpty()) {
+                    "Таблица пуста"
+                } else {
+                    buildString {
+                        append("Подключение: $connectionStatus\n\n")
+                        allRecords.forEach { record ->
+                            append("Серия: ${record.series1}${record.series2}, " +
+                                    "Номер: ${record.number}, CI: ${record.ci}, Табельный номер: ${record.inputTabnom}, " +
+                                    "Проверен Табельным номером: ${record.checkedTabnom ?: "-"}, Время проверки: ${record.checkedDatetime ?: "-"}, " +
+                                    "Номер Дефекта: ${record.defectId}, Комментарий: ${record.comment ?: "-"}\n___________")
+                        }
+                    }
+                }
+
+                // Показываем все в диалоге
                 AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Статус базы данных")
-                    .setMessage(status)
+                    .setTitle("Статус базы данных и все записи")
+                    .setMessage(recordsText)
                     .setPositiveButton("OK", null)
                     .show()
             }
@@ -172,21 +201,36 @@ class MainActivity : AppCompatActivity() {
     private fun showNumberStatus(number: String) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                val (statusText, isScannable, colorRes) = databaseHelper.checkNumberStatus(number)
+                // Проверяем статус в базе без изменения номера, передаём CI из спиннера
+                val (statusText, isScannable, colorRes) =
+                    databaseHelper.checkNumberStatus(number, currentWorkerId, selectedCiCode)
+
                 runOnUiThread {
-                    binding.statusText.text = statusText
-                    binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, colorRes))
-                    updateScanButtonState(isScannable)
+                    // Обновляем текст кнопки
+                    binding.scanButton.text = statusText
+
+                    // Обновляем цвет кнопки
+                    binding.scanButton.backgroundTintList =
+                        ContextCompat.getColorStateList(this@MainActivity, colorRes)
+
+                    // Включаем или отключаем кнопку
+                    binding.scanButton.isEnabled = isScannable
                 }
+
             } catch (e: Exception) {
                 runOnUiThread {
-                    binding.statusText.text = "Ошибка проверки статуса"
-                    binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_red_light))
-                    updateScanButtonState(false)
+                    // Ошибка при проверке
+                    binding.scanButton.text = "Ошибка проверки статуса"
+                    binding.scanButton.backgroundTintList =
+                        ContextCompat.getColorStateList(this@MainActivity, android.R.color.holo_red_light)
+                    binding.scanButton.isEnabled = false
                 }
             }
         }
     }
+
+
+
 
     private fun lockUI() {
         binding.previewView.isEnabled = false
@@ -411,6 +455,8 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             binding.resultText?.text = ""
             binding.statusText?.text = ""
+            binding.scanButton.text = ""
+            binding.scanButton.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.darker_gray)
             binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this, android.R.color.transparent))
             binding.scanRect.visibility = View.INVISIBLE
             updateScanButtonState(false)
