@@ -28,6 +28,9 @@ import kotlin.math.abs
 import android.widget.EditText
 import android.text.InputType
 import android.view.KeyEvent
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import androidx.camera.core.Camera
 import com.example.proect.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +40,7 @@ import java.io.File
 
 @androidx.camera.core.ExperimentalGetImage
 class MainActivity : AppCompatActivity() {
+    private lateinit var Spinner : Spinner
     private lateinit var binding: ActivityMainBinding
     private lateinit var databaseHelper: DatabaseHelper
     private lateinit var workersMap: Map<String, String>
@@ -77,6 +81,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         databaseHelper = DatabaseHelper(this)
         workersMap = loadWorkersData()
+        Spinner = findViewById(R.id.resultStatus)
         lockUI()
         showWorkerIdDialog()
         binding.scanButton.isEnabled = false
@@ -86,6 +91,32 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             val status = databaseHelper.testConnection()
             binding.dbStatus.text = status
+        }
+        val spinnerItems = listOf(
+            "титул",
+            "книжка",
+            "вн.лист"
+        )
+
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            spinnerItems
+        )
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+
+        Spinner.adapter = adapter
+
+        Spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>, view: View?, position: Int, id: Long
+            ) {
+
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {
+                binding.statusText.text = "Ничего не выбрано"
+            }
         }
         binding.scanButton.setOnClickListener {
             if (isScanning) {
@@ -464,23 +495,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val avgGradient = sumGradient / (bitmap.width * bitmap.height)
-        return avgGradient > 15.0
+        return avgGradient > 0.0
     }
 
     private fun recognizeText(bitmap: Bitmap, callback: (String) -> Unit) {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         val image = InputImage.fromBitmap(bitmap, 0)
+
         recognizer.process(image)
             .addOnSuccessListener { visionText ->
-                val digitsOnly = visionText.text.filter { it.isDigit() }
-                Log.d("OCR", "Recognized text: $digitsOnly")
-                callback(digitsOnly)
+                val numbers = buildString {
+                    for (block in visionText.textBlocks) {
+                        for (line in block.lines) {
+                            for (element in line.elements) {
+                                append(element.text.filter { it.isDigit() })
+                            }
+                        }
+                    }
+                }
+
+                Log.d("OCR", "Все найденные числа: $numbers")
+                callback(numbers) // вернёт одну строку, типа "1234567890"
             }
             .addOnFailureListener { e ->
-                Log.e("OCR", "Text recognition error", e)
+                Log.e("OCR", "Ошибка OCR", e)
                 callback("")
             }
     }
+
+
 
     private fun ImageProxy.toBitmap(): Bitmap? {
         return try {

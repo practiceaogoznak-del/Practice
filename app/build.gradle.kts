@@ -58,15 +58,12 @@ dependencies {
     implementation("com.google.android.material:material:1.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    implementation("com.impossibl.pgjdbc-ng:pgjdbc-ng:0.8.6") // правильная зависимость для Android
-    implementation("io.netty:netty-all:4.1.53.Final") // нужно для pgjdbc-ng
-
     implementation("androidx.camera:camera-core:1.3.4")
     implementation("androidx.camera:camera-camera2:1.3.4")
     implementation("androidx.camera:camera-lifecycle:1.3.4")
     implementation("androidx.camera:camera-view:1.3.4")
 
-    // MLKit и прочее
+    implementation("net.sourceforge.jtds:jtds:1.3.1")
     implementation("com.google.mlkit:image-labeling:17.0.7") { exclude("com.google.auto.value") }
     implementation("com.google.mlkit:vision-common:17.3.0") { exclude("com.google.auto.value") }
     implementation("com.google.auto.value:auto-value-annotations:1.10.4")
@@ -75,4 +72,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
     implementation("androidx.lifecycle:lifecycle-common-java8:2.6.2")
     implementation("androidx.multidex:multidex:2.0.1")
+    implementation(libs.play.services.mlkit.text.recognition.common)
+    implementation(libs.play.services.mlkit.text.recognition)
 }

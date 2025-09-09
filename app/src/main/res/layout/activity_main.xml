@@ -32,15 +32,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"/>
 
-    <Button
-        android:id="@+id/toggleStorage"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Переключить на файлы"
-        app:layout_constraintBottom_toBottomOf="@+id/previewView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Preview камеры (верхняя половина экрана) -->
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
@@ -83,7 +75,7 @@
         <LinearLayout
             android:id="@+id/resultContainer"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="100dp"
             android:orientation="horizontal"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -127,6 +119,7 @@
                 android:textSize="28dp"
                 android:textColor="#FFFFFF"
                 android:background="@color/red"/>
+
         </LinearLayout>
 
         <!-- Текст статуса -->
@@ -187,6 +180,17 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             app:layout_constraintGuide_percent="0.5"/>
+
+        <Spinner
+            android:id="@+id/resultStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="88dp"
+            android:layout_marginLeft="140dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/resultContainer"
+        />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
