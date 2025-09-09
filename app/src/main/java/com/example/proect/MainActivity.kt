@@ -64,20 +64,20 @@ class MainActivity : AppCompatActivity() {
     private val REQUEST_CODE_PERMISSIONS = 10
     private val REQUIRED_PERMISSIONS = arrayOf(
         Manifest.permission.CAMERA,
-        Manifest.permission.WRITE_EXTERNAL_STORAGE // Added for debug image saving
+        Manifest.permission.WRITE_EXTERNAL_STORAGE
     )
     private val imageAnalysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
         .build()
-    // Сопоставление значения спиннера с кодом CI
+
     private val ciMap = mapOf(
         "титул" to "03",
         "книжка" to "05",
         "вн.лист" to "53"
     )
 
-    // Хранит выбранный код CI
+
     private var selectedCiCode: String = ""
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,14 +122,14 @@ class MainActivity : AppCompatActivity() {
                 val selectedItem = parent.getItemAtPosition(position).toString()
                 selectedCiCode = ciMap[selectedItem] ?: ""
 
-                // Обновляем статус на экране
+
                 binding.statusText.text = if (selectedCiCode.isNotEmpty()) {
                     "Выбран: $selectedItem "
                 } else {
                     "Ничего не выбрано"
                 }
 
-                // Если уже есть распознанный номер, проверяем его **без изменения**
+
                 if (part3Digits.length == 10) {
                     showNumberStatus(part3Digits)
                 }
@@ -157,13 +157,11 @@ class MainActivity : AppCompatActivity() {
         }
         binding.openBaza.setOnClickListener {
             CoroutineScope(Dispatchers.Main).launch {
-                // Сначала проверяем соединение
+
                 val connectionStatus = databaseHelper.testConnection()
 
-                // Получаем все записи из таблицы
                 val allRecords = databaseHelper.getAllRecords()
 
-                // Формируем строку для отображения
                 val recordsText = if (allRecords.isEmpty()) {
                     "Таблица пуста"
                 } else {
@@ -178,7 +176,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Показываем все в диалоге
+
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("Статус базы данных и все записи")
                     .setMessage(recordsText)
@@ -201,25 +199,23 @@ class MainActivity : AppCompatActivity() {
     private fun showNumberStatus(number: String) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                // Проверяем статус в базе без изменения номера, передаём CI из спиннера
+
                 val (statusText, isScannable, colorRes) =
                     databaseHelper.checkNumberStatus(number, currentWorkerId, selectedCiCode)
 
                 runOnUiThread {
-                    // Обновляем текст кнопки
+
                     binding.scanButton.text = statusText
 
-                    // Обновляем цвет кнопки
                     binding.scanButton.backgroundTintList =
                         ContextCompat.getColorStateList(this@MainActivity, colorRes)
 
-                    // Включаем или отключаем кнопку
                     binding.scanButton.isEnabled = isScannable
                 }
 
             } catch (e: Exception) {
                 runOnUiThread {
-                    // Ошибка при проверке
+
                     binding.scanButton.text = "Ошибка проверки статуса"
                     binding.scanButton.backgroundTintList =
                         ContextCompat.getColorStateList(this@MainActivity, android.R.color.holo_red_light)
@@ -561,7 +557,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 Log.d("OCR", "Все найденные числа: $numbers")
-                callback(numbers) // вернёт одну строку, типа "1234567890"
+                callback(numbers)
             }
             .addOnFailureListener { e ->
                 Log.e("OCR", "Ошибка OCR", e)
@@ -604,7 +600,7 @@ class MainActivity : AppCompatActivity() {
         try {
             val debugDir = File(getExternalFilesDir(null), "ocr_debug")
             if (!debugDir.exists()) {
-                debugDir.mkdirs() // Ensure the directory exists
+                debugDir.mkdirs()
             }
             File(debugDir, "debug_${System.currentTimeMillis()}.jpg").outputStream().use { out ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)

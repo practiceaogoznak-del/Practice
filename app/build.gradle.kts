@@ -2,7 +2,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt") // Оставляем, если используем Room
+    id("kotlin-kapt")
 }
 
 android {

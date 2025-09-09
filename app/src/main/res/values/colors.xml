@@ -12,5 +12,5 @@
     <color name="dim_red">#80FF0000</color>
     <color name="dim_green">#8000FF00</color>
     <color name="dim_yellow">#80FFFF00</color>
-    <color name="dark_red">#CC0000</color> <!-- Более темный красный для лучшего контраста -->
+    <color name="dark_red">#CC0000</color>
 </resources>

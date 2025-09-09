@@ -27,16 +27,13 @@ data class ZadelkaRecord(
 
 class DatabaseHelper(private val context: Context) {
 
-    // Database connection details (replace with your actual values)
-    // WARNING: Do NOT hardcode credentials in production code! Use secure storage (e.g., Android Keystore) or environment variables.
-    private val server = "06SQL"  // e.g., "192.168.1.100" or "sqlserver.example.com"
-    private val port = "1433"  // Default SQL Server port
+
+    private val server = "06SQL"
     private val databaseName = "PPFDATA"
     private val username = "arm79100"
     private val password = "Android79100"
     private val connectionUrl = "jdbc:jtds:sqlserver://$server;databaseName=$databaseName;user=$username;password=$password;encrypt=true;trustServerCertificate=true"
 
-    // Test the database connection
     suspend fun testConnection(): String = withContext(Dispatchers.IO) {
         var connection: Connection? = null
         try {
@@ -51,7 +48,6 @@ class DatabaseHelper(private val context: Context) {
         }
     }
 
-    // Create a new record in the zadelka table
     suspend fun createRecord(
         series1: String,
         series2: String,
@@ -164,7 +160,6 @@ class DatabaseHelper(private val context: Context) {
         }
     }
 
-    // Read all records
     suspend fun getAllRecords(): List<ZadelkaRecord> = withContext(Dispatchers.IO) {
         var connection: Connection? = null
         var preparedStatement: PreparedStatement? = null
@@ -208,7 +203,6 @@ class DatabaseHelper(private val context: Context) {
         }
     }
 
-    // Update the status of a number (set checked_tabnom and checked_datetime)
     suspend fun updateNumberStatus(number: String, workerId: String): Boolean = withContext(Dispatchers.IO) {
         var connection: Connection? = null
         var preparedStatement: PreparedStatement? = null
@@ -243,7 +237,6 @@ class DatabaseHelper(private val context: Context) {
         }
     }
 
-    // Update additional fields (e.g., comment or defect_id)
     suspend fun updateRecordDetails(id: Int, defectId: Int, comment: String?): Boolean = withContext(Dispatchers.IO) {
         var connection: Connection? = null
         var preparedStatement: PreparedStatement? = null
@@ -270,7 +263,6 @@ class DatabaseHelper(private val context: Context) {
         }
     }
 
-    // Delete a record by id
     suspend fun deleteRecord(id: Int): Boolean = withContext(Dispatchers.IO) {
         var connection: Connection? = null
         var preparedStatement: PreparedStatement? = null
