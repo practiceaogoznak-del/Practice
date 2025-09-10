@@ -120,11 +120,7 @@ class MainActivity : AppCompatActivity() {
                 selectedCiCode = ciMap[selectedItem] ?: ""
 
 
-                binding.statusText.text = if (selectedCiCode.isNotEmpty()) {
-                    "Выбран: $selectedItem "
-                } else {
-                    "Ничего не выбрано"
-                }
+
 
 
                 if (part3Digits.length == 10) {
@@ -134,7 +130,7 @@ class MainActivity : AppCompatActivity() {
 
 
             override fun onNothingSelected(parent: AdapterView<*>) {
-                binding.statusText.text = "Ничего не выбрано"
+
                 selectedCiCode = ""
             }
         }
@@ -152,35 +148,8 @@ class MainActivity : AppCompatActivity() {
         binding.resetButton.setOnClickListener {
             resetScanning()
         }
-        binding.openBaza.setOnClickListener {
-            CoroutineScope(Dispatchers.Main).launch {
-
-                val connectionStatus = databaseHelper.testConnection()
-
-                val allRecords = databaseHelper.getAllRecords()
-
-                val recordsText = if (allRecords.isEmpty()) {
-                    "Таблица пуста"
-                } else {
-                    buildString {
-                        append("Подключение: $connectionStatus\n\n")
-                        allRecords.forEach { record ->
-                            append("Серия: ${record.series1}${record.series2}, " +
-                                    "Номер: ${record.number}, CI: ${record.ci}, Табельный номер: ${record.inputTabnom}, " +
-                                    "Проверен Табельным номером: ${record.checkedTabnom ?: "-"}, Время проверки: ${record.checkedDatetime ?: "-"}, " +
-                                    "Номер Дефекта: ${record.defectId}, Комментарий: ${record.comment ?: "-"}\n___________")
-                        }
-                    }
-                }
 
 
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Статус базы данных и все записи")
-                    .setMessage(recordsText)
-                    .setPositiveButton("OK", null)
-                    .show()
-            }
-        }
         binding.resultText.textSize = 35f
         binding.resultText.setTypeface(null, Typeface.BOLD)
         if (allPermissionsGranted()) {
@@ -232,7 +201,7 @@ class MainActivity : AppCompatActivity() {
         binding.previewView.isEnabled = false
         binding.scanButton.isEnabled = false
         binding.resetButton.isEnabled = false
-        binding.openBaza.isEnabled = false
+
         binding.previewView.alpha = 0.7f
     }
 
@@ -240,7 +209,7 @@ class MainActivity : AppCompatActivity() {
         binding.previewView.isEnabled = true
         binding.scanButton.isEnabled = true
         binding.resetButton.isEnabled = true
-        binding.openBaza.isEnabled = true
+
         binding.previewView.alpha = 1f
     }
 
@@ -260,14 +229,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (isFinishing || isDestroyed) {
-            return
-        }
-        if (!isDialogShown && binding.fioEditText.text.isNullOrEmpty()) {
+        if (currentWorkerId.isEmpty()) {
             lockUI()
-
+            showWorkerIdDialog()
         }
     }
+
 
     private fun resetUserState() {
         currentWorkerId = ""
@@ -278,57 +245,58 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showWorkerIdDialog() {
+        if (isDialogShown) return
+        isDialogShown = true
+
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Введите табельный номер")
 
-        val input = EditText(this)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf(android.text.InputFilter.LengthFilter(6)) // максимум 6 цифр
+        }
         builder.setView(input)
 
-        builder.setPositiveButton("OK") { dialog, _ ->
-            val workerId = input.text.toString().trim()
+        builder.setCancelable(false) // нельзя закрыть кнопкой назад
+        builder.setPositiveButton("OK", null)
+        val dialog = builder.create()
+        dialog.setCanceledOnTouchOutside(false)
 
-            if (workerId.isEmpty()) {
-                input.error = "Введите табельный номер"
-                input.requestFocus()
-                return@setPositiveButton
-            }
+        dialog.setOnShowListener {
+            val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            button.setOnClickListener {
+                var workerId = input.text.toString().trim()
 
-            // Проверяем табельный номер в БД
-            CoroutineScope(Dispatchers.Main).launch {
-                val fio = databaseHelper.getWorkerFioByTabnom(workerId)
+                // Приводим табельный номер к 6 цифрам с префиксом '8'
+                if (workerId.length < 6) {
+                    workerId = "8" + workerId.padStart(5, '0')
+                }
 
-                if (fio != null) {
-                    // ✅ Табельный номер найден, сохраняем данные
-                    currentWorkerId = workerId
-                    currentWorkerFio = fio
-
-                    // Заполняем поле с ФИО
-                    binding.fioEditText.setText(fio)
-                    binding.fioEditText.isEnabled = false
-
-                    // Закрываем диалог
-                    dialog.dismiss()
-
-                    // Разблокируем остальной интерфейс
-                    unlockUI()
-
-                    // Приветствуем пользователя
-                    showWelcomeMessage(fio)
-                } else {
-                    // ❌ Табельный номер не найден
-                     Toast.makeText(this@MainActivity,"Данный табельный номер не зарегистрирован",Toast.LENGTH_SHORT).show()
-
-                    input.requestFocus()
-                    closeCamera()
+                CoroutineScope(Dispatchers.Main).launch {
+                    val fio = databaseHelper.getWorkerFioByTabnom(workerId)
+                    if (fio != null) {
+                        currentWorkerId = workerId
+                        currentWorkerFio = fio
+                        binding.fioEditText.setText(fio)
+                        binding.fioEditText.isEnabled = false
+                        unlockUI()
+                        showWelcomeMessage(fio)
+                        isDialogShown = false
+                        dialog.dismiss()
+                    } else {
+                        Toast.makeText(this@MainActivity,"Данный табельный номер не зарегистрирован",Toast.LENGTH_SHORT).show()
+                        input.text.clear()
+                        input.requestFocus()
+                    }
                 }
             }
         }
 
-        builder.setNegativeButton("Отмена") { dialog, _ -> dialog.cancel() }
-
-        builder.show()
+        dialog.show()
     }
+
+
+
 
     private fun validateWorkerId(workerId: String): Boolean {
         return workerId.isNotEmpty() && workersMap.containsKey(workerId)
@@ -381,7 +349,7 @@ class MainActivity : AppCompatActivity() {
                             showNumberStatus(part3Digits)
                         } else {
                             binding.resultText.text = ""
-                            binding.statusText.text = ""
+
                             binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.transparent))
                             updateScanButtonState(false)
                         }
@@ -392,7 +360,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     isScanning = false
                     binding.resultText.text = ""
-                    binding.statusText.text = ""
+
                     binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.transparent))
                     binding.scanRect.visibility = View.INVISIBLE
                     updateScanButtonState(false)
@@ -462,7 +430,7 @@ class MainActivity : AppCompatActivity() {
         isResultShown = false
         runOnUiThread {
             binding.resultText?.text = ""
-            binding.statusText?.text = ""
+
             binding.scanButton.text = ""
             binding.scanButton.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.darker_gray)
             binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this, android.R.color.transparent))
