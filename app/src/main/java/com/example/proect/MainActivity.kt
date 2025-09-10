@@ -96,10 +96,7 @@ class MainActivity : AppCompatActivity() {
         binding.scanButton.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.darker_gray)
         binding.resultCard.setCardBackgroundColor(ContextCompat.getColor(this, android.R.color.transparent))
         cameraExecutor = Executors.newSingleThreadExecutor()
-        CoroutineScope(Dispatchers.Main).launch {
-            val status = databaseHelper.testConnection()
-            binding.dbStatus.text = status
-        }
+
         val spinnerItems = listOf(
             "титул",
             "книжка",
@@ -194,6 +191,9 @@ class MainActivity : AppCompatActivity() {
                 this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
             )
         }
+
+
+
     }
 
     private fun showNumberStatus(number: String) {
@@ -265,7 +265,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (!isDialogShown && binding.fioEditText.text.isNullOrEmpty()) {
             lockUI()
-            showWorkerIdDialog()
+
         }
     }
 
@@ -278,44 +278,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showWorkerIdDialog() {
-        if (isDialogShown || isFinishing || isDestroyed) return
-        isDialogShown = true
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            hint = "Введите ваш номер работника"
-            setSingleLine(true)
-        }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Идентификация")
-            .setMessage("Введите ваш табельный номер")
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton("Продолжить") { dialog, _ ->
-                val workerId = input.text.toString().trim()
-                if (validateWorkerId(workerId)) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Введите табельный номер")
+
+        val input = EditText(this)
+        input.inputType = InputType.TYPE_CLASS_NUMBER
+        builder.setView(input)
+
+        builder.setPositiveButton("OK") { dialog, _ ->
+            val workerId = input.text.toString().trim()
+
+            if (workerId.isEmpty()) {
+                input.error = "Введите табельный номер"
+                input.requestFocus()
+                return@setPositiveButton
+            }
+
+            // Проверяем табельный номер в БД
+            CoroutineScope(Dispatchers.Main).launch {
+                val fio = databaseHelper.getWorkerFioByTabnom(workerId)
+
+                if (fio != null) {
+                    // ✅ Табельный номер найден, сохраняем данные
                     currentWorkerId = workerId
-                    currentWorkerFio = workersMap[workerId] ?: ""
-                    binding.fioEditText.setText(currentWorkerFio)
+                    currentWorkerFio = fio
+
+                    // Заполняем поле с ФИО
+                    binding.fioEditText.setText(fio)
                     binding.fioEditText.isEnabled = false
+
+                    // Закрываем диалог
                     dialog.dismiss()
+
+                    // Разблокируем остальной интерфейс
                     unlockUI()
-                    showWelcomeMessage(currentWorkerFio)
+
+                    // Приветствуем пользователя
+                    showWelcomeMessage(fio)
                 } else {
-                    input.error = "Номер не найден"
+                    // ❌ Табельный номер не найден
+                     Toast.makeText(this@MainActivity,"Данный табельный номер не зарегистрирован",Toast.LENGTH_SHORT).show()
+
                     input.requestFocus()
+                    closeCamera()
                 }
             }
-            .setOnDismissListener {
-                isDialogShown = false
-            }
-            .create()
-        dialog.setOnKeyListener { _, keyCode, _ ->
-            keyCode == KeyEvent.KEYCODE_BACK
         }
-        dialog.setCanceledOnTouchOutside(false)
-        if (!isFinishing && !isDestroyed) {
-            dialog.show()
-        }
+
+        builder.setNegativeButton("Отмена") { dialog, _ -> dialog.cancel() }
+
+        builder.show()
     }
 
     private fun validateWorkerId(workerId: String): Boolean {
@@ -650,4 +662,14 @@ class MainActivity : AppCompatActivity() {
         }
         cameraExecutor.shutdown()
     }
+
+    private fun closeCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            cameraProvider.unbindAll()
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+
 }

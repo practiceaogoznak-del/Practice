@@ -282,4 +282,76 @@ class DatabaseHelper(private val context: Context) {
             connection?.close()
         }
     }
+
+    suspend fun validateWorkerTabnom(workerId: String): Boolean = withContext(Dispatchers.IO) {
+        var connection: Connection? = null
+        var preparedStatement: PreparedStatement? = null
+        var resultSet: ResultSet? = null
+        try {
+            var tabnom = workerId
+            if (tabnom.length < 6) {
+                tabnom = "8" + tabnom.padStart(5, '0')
+            }
+
+            Class.forName("net.sourceforge.jtds.jdbc.Driver")
+            connection = DriverManager.getConnection(connectionUrl)
+
+            val query = """
+            SELECT TOP 1 fio 
+            FROM PPFDATA.common.v_personal 
+            WHERE tn = ?
+        """
+            preparedStatement = connection.prepareStatement(query)
+            preparedStatement.setString(1, tabnom)
+            resultSet = preparedStatement.executeQuery()
+
+            return@withContext resultSet.next()
+        } catch (e: SQLException) {
+            Log.e("DBHelper", "validateWorkerTabnom failed", e)
+            return@withContext false
+        } finally {
+            resultSet?.close()
+            preparedStatement?.close()
+            connection?.close()
+        }
+    }
+
+    suspend fun getWorkerFioByTabnom(workerId: String): String? = withContext(Dispatchers.IO) {
+        var connection: Connection? = null
+        var preparedStatement: PreparedStatement? = null
+        var resultSet: ResultSet? = null
+        try {
+            var tabnom = workerId
+            if (tabnom.length < 6) {
+                tabnom = "8" + tabnom.padStart(5, '0')
+            }
+
+            Class.forName("net.sourceforge.jtds.jdbc.Driver")
+            connection = DriverManager.getConnection(connectionUrl)
+
+            val query = """
+            SELECT TOP 1 fio 
+            FROM PPFDATA.common.v_personal 
+            WHERE tn = ?
+        """
+            preparedStatement = connection.prepareStatement(query)
+            preparedStatement.setString(1, tabnom)
+            resultSet = preparedStatement.executeQuery()
+
+            return@withContext if (resultSet.next()) {
+                resultSet.getString("fio")
+            } else {
+                null
+            }
+        } catch (e: SQLException) {
+            Log.e("DBHelper", "getWorkerFioByTabnom failed", e)
+            return@withContext null
+        } finally {
+            resultSet?.close()
+            preparedStatement?.close()
+            connection?.close()
+        }
+    }
+
+
 }
