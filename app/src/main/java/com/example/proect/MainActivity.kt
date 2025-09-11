@@ -3,6 +3,7 @@ package com.example.proect
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -30,7 +31,10 @@ import android.text.InputType
 import android.view.KeyEvent
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.Spinner
+import android.widget.TextView
 import androidx.camera.core.Camera
 import com.example.proect.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +44,11 @@ import java.io.File
 
 @androidx.camera.core.ExperimentalGetImage
 class MainActivity : AppCompatActivity() {
+    private val PREFS_NAME = "image_settings"
+    private val KEY_CONTRAST = "contrast"
+    private val KEY_CLARITY = "clarity"
+    private var clarityThreshold: Float = 5.0f
+    private var contrastValue: Float = 5.0f
     private lateinit var Spinner : Spinner
     private lateinit var binding: ActivityMainBinding
     private lateinit var databaseHelper: DatabaseHelper
@@ -55,6 +64,7 @@ class MainActivity : AppCompatActivity() {
     private var isResultShown = false
     private var isDialogShown = false
     private val scanHandler = Handler(Looper.getMainLooper())
+
     private val scanRunnable = object : Runnable {
         override fun run() {
             autoScanRedRectangle()
@@ -91,6 +101,9 @@ class MainActivity : AppCompatActivity() {
         workersMap = loadWorkersData()
         Spinner = findViewById(R.id.resultStatus)
         lockUI()
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        contrastValue = prefs.getFloat(KEY_CONTRAST, 1.0f)       // по умолчанию 1.0
+        clarityThreshold = prefs.getFloat(KEY_CLARITY, 5.0f)
         showWorkerIdDialog()
         binding.scanButton.isEnabled = false
         binding.scanButton.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.darker_gray)
@@ -485,14 +498,15 @@ class MainActivity : AppCompatActivity() {
     private fun preprocessImage(bitmap: Bitmap): Bitmap {
         return createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888).applyCanvas {
             val paint = Paint().apply {
+                val c = contrastValue
                 colorFilter = ColorMatrixColorFilter(
                     ColorMatrix().apply {
-                        setSaturation(0f)
+                        setSaturation(0f) // убираем цвет
                         set(
                             floatArrayOf(
-                                2.0f, 0f, 0f, 0f, -100f,
-                                0f, 2.0f, 0f, 0f, -100f,
-                                0f, 0f, 2.0f, 0f, -100f,
+                                c, 0f, 0f, 0f, -128f * (c - 1),
+                                0f, c, 0f, 0f, -128f * (c - 1),
+                                0f, 0f, c, 0f, -128f * (c - 1),
                                 0f, 0f, 0f, 1f, 0f
                             )
                         )
@@ -502,6 +516,7 @@ class MainActivity : AppCompatActivity() {
             drawBitmap(bitmap, 0f, 0f, paint)
         }
     }
+
 
     private fun isImageClear(bitmap: Bitmap): Boolean {
         val pixels = IntArray(bitmap.width * bitmap.height)
@@ -517,7 +532,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val avgGradient = sumGradient / (bitmap.width * bitmap.height)
-        return avgGradient > 0.0
+        return avgGradient > clarityThreshold
     }
 
     private fun recognizeText(bitmap: Bitmap, callback: (String) -> Unit) {
@@ -638,6 +653,142 @@ class MainActivity : AppCompatActivity() {
             cameraProvider.unbindAll()
         }, ContextCompat.getMainExecutor(this))
     }
+
+    fun changeImageSettings(view: View) {
+        val contrastSeekBar = SeekBar(this).apply {
+            max = 300
+            progress = (contrastValue * 10).toInt().coerceIn(0, 300)
+        }
+        val contrastText = TextView(this).apply {
+            text = "Контраст: %.1f".format(contrastValue)
+            textSize = 18f
+            setPadding(32, 16, 32, 16)
+        }
+
+        val claritySeekBar = SeekBar(this).apply {
+            max = 300
+            progress = (clarityThreshold * 10).toInt().coerceIn(0, 500)
+        }
+        val clarityText = TextView(this).apply {
+            text = "Порог резкости: %.1f".format(clarityThreshold)
+            textSize = 18f
+            setPadding(32, 16, 32, 16)
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+            addView(contrastText)
+            addView(contrastSeekBar)
+            addView(clarityText)
+            addView(claritySeekBar)
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Настройки изображения")
+            .setView(container)
+            .setPositiveButton("OK") { d, _ ->
+                contrastValue = contrastSeekBar.progress / 10f
+                clarityThreshold = claritySeekBar.progress / 10f
+
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                prefs.edit()
+                    .putFloat(KEY_CONTRAST, contrastValue)
+                    .putFloat(KEY_CLARITY, clarityThreshold)
+                    .apply()
+
+                Toast.makeText(
+                    this,
+                    "Контраст: $contrastValue, Порог: $clarityThreshold",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    binding.previewView.setRenderEffect(
+                        RenderEffect.createColorFilterEffect(
+                            ColorMatrixColorFilter(
+                                ColorMatrix().apply {
+                                    val c = contrastValue
+                                    set(
+                                        floatArrayOf(
+                                            c, 0f, 0f, 0f, -128f * (c - 1),
+                                            0f, c, 0f, 0f, -128f * (c - 1),
+                                            0f, 0f, c, 0f, -128f * (c - 1),
+                                            0f, 0f, 0f, 1f, 0f
+                                        )
+                                    )
+                                }
+                            )
+                        )
+                    )
+                }
+
+                d.dismiss()
+            }
+            .setNegativeButton("Отмена", null)
+            .setNeutralButton("Сбросить") { d, _ ->
+                contrastValue = 1.0f
+                clarityThreshold = 5.0f
+
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                prefs.edit()
+                    .putFloat(KEY_CONTRAST, contrastValue)
+                    .putFloat(KEY_CLARITY, clarityThreshold)
+                    .apply()
+
+                Toast.makeText(
+                    this,
+                    "Сброшено: Контраст = $contrastValue, Порог = $clarityThreshold",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                // сброс эффекта на превью
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    binding.previewView.setRenderEffect(
+                        RenderEffect.createColorFilterEffect(
+                            ColorMatrixColorFilter(
+                                ColorMatrix().apply {
+                                    val c = contrastValue
+                                    set(
+                                        floatArrayOf(
+                                            c, 0f, 0f, 0f, -128f * (c - 1),
+                                            0f, c, 0f, 0f, -128f * (c - 1),
+                                            0f, 0f, c, 0f, -128f * (c - 1),
+                                            0f, 0f, 0f, 1f, 0f
+                                        )
+                                    )
+                                }
+                            )
+                        )
+                    )
+                }
+
+                d.dismiss()
+            }
+            .create()
+
+        contrastSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                contrastText.text = "Контраст: %.1f".format(progress / 10f)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        claritySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                clarityText.text = "Порог резкости: %.1f".format(progress / 10f)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        dialog.show()
+    }
+
+
+
+
 
 
 }
